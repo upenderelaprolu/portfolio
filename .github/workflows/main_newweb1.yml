@@ -1,4 +1,4 @@
-name: Deploy to Azure Web App
+name: Deploy portfolio to Azure Web App - webnew2
 
 on:
   push:
@@ -6,51 +6,26 @@ on:
       - main
   workflow_dispatch:
 
-permissions:
-  contents: read
-  id-token: write
-
 jobs:
   deploy:
-    runs-on: ubuntu-latest
-    env:
-      AZURE_WEBAPP_NAME: ${{ secrets.AZURE_WEBAPP_NAME }}
-      AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
-      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
-      AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-      AZURE_WEBAPP_PACKAGE_PATH: ./release.zip
+    runs-on: windows-latest
+
+    permissions:
+      id-token: write
+      contents: read
 
     steps:
       - name: Checkout source code
         uses: actions/checkout@v4
 
-      - name: Create deployment package
-        shell: bash
-        run: |
-          zip -r release.zip . \
-            -x ".git/*" \
-               ".github/*" \
-               "release.zip"
-
-      - name: Validate required Azure settings
-        shell: bash
-        run: |
-          for var in AZURE_WEBAPP_NAME AZURE_CLIENT_ID AZURE_TENANT_ID AZURE_SUBSCRIPTION_ID; do
-            if [ -z "${!var}" ]; then
-              echo "Missing required secret or variable: $var"
-              exit 1
-            fi
-          done
-
       - name: Login to Azure
         uses: azure/login@v2
         with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
 
       - name: Deploy to Azure Web App
         uses: azure/webapps-deploy@v3
         with:
-          app-name: ${{ env.AZURE_WEBAPP_NAME }}
-          package: ${{ env.AZURE_WEBAPP_PACKAGE_PATH }}
+          app-name: webnew2
+          slot-name: Production
+          package: .
