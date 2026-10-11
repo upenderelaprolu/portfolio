@@ -1,4 +1,4 @@
-name: Build and deploy ASP.NET app to Azure Web App - newweb1
+name: Build and deploy ASP.NET Core app to Azure Web App - newweb1
 
 on:
   push:
@@ -17,25 +17,51 @@ jobs:
       - name: Checkout source code
         uses: actions/checkout@v4
 
-      - name: Setup MSBuild
-        uses: microsoft/setup-msbuild@v2
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
 
-      - name: Setup NuGet
-        uses: NuGet/setup-nuget@v2
+      - name: Find ASP.NET Core project
+        id: project
+        shell: pwsh
+        run: |
+          $projects = @(
+            Get-ChildItem -Path $env:GITHUB_WORKSPACE `
+              -Filter *.csproj -Recurse |
+              Where-Object {
+                $_.FullName -notmatch '[\\/](bin|obj)[\\/]'
+              }
+          )
+
+          if ($projects.Count -eq 0) {
+            Write-Error "No .csproj file found in the repository."
+            exit 1
+          }
+
+          if ($projects.Count -gt 1) {
+            Write-Host "Found multiple project files:"
+            $projects | ForEach-Object {
+              Write-Host $_.FullName
+            }
+
+            Write-Error "Multiple projects found. Specify the web project path explicitly."
+            exit 1
+          }
+
+          $projectPath = $projects[0].FullName
+          Write-Host "Project found: $projectPath"
+
+          "project_path=$projectPath" >> $env:GITHUB_OUTPUT
 
       - name: Restore NuGet packages
-        run: nuget restore
+        run: dotnet restore "${{ steps.project.outputs.project_path }}"
 
-      - name: Build and publish ASP.NET application
-        shell: cmd
-        run: >
-          msbuild
-          /nologo
-          /verbosity:minimal
-          /t:Build
-          /t:PipelinePreDeployCopyAllFilesToOneFolder
-          /p:Configuration=Release
-          /p:_PackageTempDir="${{ github.workspace }}\published\"
+      - name: Build ASP.NET Core application
+        run: dotnet build "${{ steps.project.outputs.project_path }}" --configuration Release --no-restore
+
+      - name: Publish ASP.NET Core application
+        run: dotnet publish "${{ steps.project.outputs.project_path }}" --configuration Release --no-build --output "${{ github.workspace }}\published"
 
       - name: Upload published artifact
         uses: actions/upload-artifact@v4
