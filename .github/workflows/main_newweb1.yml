@@ -1,4 +1,4 @@
-name: Deploy portfolio to Azure Web App - webnew2
+name: Deploy portfolio to Azure Web App - uppuweb
 
 on:
   push:
