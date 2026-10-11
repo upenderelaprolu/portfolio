@@ -1,4 +1,4 @@
-name: Build and deploy ASP.NET Core app to Azure Web App - newweb1
+name: Deploy static portfolio to Azure Web App - newweb1
 
 on:
   push:
@@ -7,83 +7,23 @@ on:
   workflow_dispatch:
 
 jobs:
-  build:
-    runs-on: windows-latest
-
-    permissions:
-      contents: read
-
-    steps:
-      - name: Checkout source code
-        uses: actions/checkout@v4
-
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: '8.0.x'
-
-      - name: Find ASP.NET Core project
-        id: project
-        shell: pwsh
-        run: |
-          $projects = @(
-            Get-ChildItem -Path $env:GITHUB_WORKSPACE `
-              -Filter *.csproj -Recurse |
-              Where-Object {
-                $_.FullName -notmatch '[\\/](bin|obj)[\\/]'
-              }
-          )
-
-          if ($projects.Count -eq 0) {
-            Write-Error "No .csproj file found in the repository."
-            exit 1
-          }
-
-          if ($projects.Count -gt 1) {
-            Write-Host "Found multiple project files:"
-            $projects | ForEach-Object {
-              Write-Host $_.FullName
-            }
-
-            Write-Error "Multiple projects found. Specify the web project path explicitly."
-            exit 1
-          }
-
-          $projectPath = $projects[0].FullName
-          Write-Host "Project found: $projectPath"
-
-          "project_path=$projectPath" >> $env:GITHUB_OUTPUT
-
-      - name: Restore NuGet packages
-        run: dotnet restore "${{ steps.project.outputs.project_path }}"
-
-      - name: Build ASP.NET Core application
-        run: dotnet build "${{ steps.project.outputs.project_path }}" --configuration Release --no-restore
-
-      - name: Publish ASP.NET Core application
-        run: dotnet publish "${{ steps.project.outputs.project_path }}" --configuration Release --no-build --output "${{ github.workspace }}\published"
-
-      - name: Upload published artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: ASP-app
-          path: published/
-          if-no-files-found: error
-
   deploy:
     runs-on: windows-latest
-    needs: build
 
     permissions:
       contents: read
       id-token: write
 
     steps:
-      - name: Download published artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: ASP-app
-          path: published/
+      - name: Checkout source code
+        uses: actions/checkout@v4
+
+      - name: Create deployment package
+        shell: pwsh
+        run: |
+          $zipPath = Join-Path $env:GITHUB_WORKSPACE "portfolio.zip"
+          Compress-Archive -Path "$env:GITHUB_WORKSPACE\*" -DestinationPath $zipPath -Force
+          Write-Host "Deployment package created: $zipPath"
 
       - name: Login to Azure
         uses: azure/login@v2
@@ -97,4 +37,4 @@ jobs:
         with:
           app-name: newweb1
           slot-name: Production
-          package: published/
+          package: ${{ github.workspace }}/portfolio.zip
