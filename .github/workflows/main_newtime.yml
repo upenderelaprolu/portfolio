@@ -1,4 +1,4 @@
-name: Deploy to newtime
+name: Deploy to Azure Web App - wenew2
 
 on:
   push:
